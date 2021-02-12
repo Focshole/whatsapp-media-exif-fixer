@@ -25,4 +25,4 @@ If you have no experience with python, I have provided an "installer", a batch f
     - On Linux/if you didn't use the installer ```python3.9 src/whatsapp-media-fixer.py```
 
 Be careful, this is I/O intensive, I would recommend you to run it over an SSD or an HDD. Use this tool at your own risk.
-Tested on Linux only, may work on Mac too but I haven't tested it. I'll try to make it Windows compatible.
+Tested on Linux only, still testing it on Windows, may work on Mac too but I haven't tested it.

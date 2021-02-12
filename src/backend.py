@@ -4,6 +4,8 @@ import time
 from datetime import datetime, timedelta
 import platform
 import piexif
+if platform.system() == "Windows":
+    from win32_setctime import setctime
 
 import signal
 
@@ -79,19 +81,30 @@ class FixExif:
         return datetime.fromtimestamp(os.path.getmtime(full_path)).date() == mod_time.date()
 
     @staticmethod
-    def set_last_access_modification_datetime(full_path, mod_time):
-            os.utime(full_path, (mod_time, mod_time))
+    def set_last_access_modification_datetime(full_path, m_date_time):
+        m=time.mktime(m_date_time.timetuple())
+        os.utime(full_path, (m, m))
+    @staticmethod
+    def set_creation_datetime(full_path,creat_time):
+        if platform.system() == 'Windows': #There is no parameter on linux about this
+                setctime(full_path, creat_time)
 
-    def fix_last_access_modification_datetime(self, m_date_time, full_path):
-        if not (self.same_modification_date(full_path, m_date_time)): # and self.same_creation_date(full_path, m_date_time)):
-            self.set_last_access_modification_datetime(full_path,time.mktime(m_date_time.timetuple()))
-            return True  # modified
-        return False
+    def fix_creation_modification_datetime(self, m_date_time, full_path):
+        modified=False
+        if platform.system() == "Windows" and not self.same_creation_date(full_path, m_date_time):
+                self.set_creation_datetime(full_path,m_date_time) 
+                # this will much probably automatically alter the modification time
+                modified=True
+        if not self.same_modification_date(full_path, m_date_time):
+            self.set_last_access_modification_datetime(full_path,m_date_time)
+            modified=True
+        return modified
 
     @staticmethod
     def same_exif_acquisition_date(date, full_path):
         # the original file's exif are much probably more reliable than
         # the ones which are generated if the date matches
+        # TODO: look for other exif datetime values
         old_exif_data = piexif.load(full_path)
         if old_exif_data is not None and 'Exif' in old_exif_data:
             exif_dict = old_exif_data['Exif']
@@ -122,11 +135,11 @@ class FixExif:
 
     def fix_video(self, filename, full_path):
         date = self.get_datetime(filename)
-        return self.fix_last_access_modification_datetime(date, full_path)
+        return self.fix_creation_modification_datetime(date, full_path)
 
     def fix_image(self, filename, full_path):
         date = self.get_datetime(filename)
-        modif = self.fix_last_access_modification_datetime(date,
+        modif = self.fix_creation_modification_datetime(date,
                                                         full_path)
         modif2 = self.fix_exif(date, full_path)
         return modif or modif2

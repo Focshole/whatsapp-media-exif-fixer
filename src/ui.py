@@ -57,18 +57,18 @@ class MainPanel(wx.Panel):
 
     def __set_layout(self):
         # First param is always the parent. Readonly cause the root shouldn't be writeable
-        # All of this sizer thing is magic. The 1 must be kept as such otherwise the items will be shrunk. I had
+        # All of this sizer thing is dark magic. The 1 must be kept as such otherwise the items will be shrunk. I had
         # followed about 8 guides, none of them worked, i ended up with a broken ui, plus some segfaults cause yeah.
         h_sizer = wx.BoxSizer(wx.HORIZONTAL)
         h_sizer.Add(self.treeCtrl, 1, wx.ALL | wx.EXPAND)  # place the tree into this sizer
-        h_sizer.AddSpacer(0)  # probably useless
+        #h_sizer.AddSpacer(0)  # probably useless
 
         right_sizer = wx.BoxSizer(wx.VERTICAL)
         right_sizer.Add(self.textCtrl, 1, wx.ALL | wx.EXPAND)
         right_sizer.Add(self.applyButton, 1, wx.ALL | wx.EXPAND)
         # The 1 is for the proportion
         h_sizer.Add(right_sizer, 1, wx.ALL | wx.EXPAND)
-        h_sizer.AddSpacer(0)
+        #h_sizer.AddSpacer(0)
         self.SetSizer(h_sizer)
 
     def on_apply_button_click(self, evcmd):
