@@ -134,7 +134,6 @@ class FixExif:
         date = self.get_datetime(filename)
         modif = self.fix_creation_modification_datetime(date,
                                                         full_path)
-        # TODO: check which parameter won't get modified (running twice shouldn't touch the same files again)
         modif2 = self.fix_exif(date, full_path)
         return modif or modif2
 
