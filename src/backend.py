@@ -64,7 +64,7 @@ class FixExif:
     def same_creation_date(full_path, creat_time):
         # https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python#237084
         if platform.system() == 'Windows':
-            return os.path.getctime(full_path).date() == creat_time.date()
+            return datetime.fromtimestamp(os.path.getctime(full_path)).date() == creat_time.date()
         else:
             stat = os.stat(full_path)
             try:
@@ -79,18 +79,12 @@ class FixExif:
         return datetime.fromtimestamp(os.path.getmtime(full_path)).date() == mod_time.date()
 
     @staticmethod
-    def set_creation_modification_datetime(full_path, mod_time):
-        # from https://stackoverflow.com/questions/42630281/utime-has-no-effect-in-windows
-        if platform.system() == "Windows":
-            with open(full_path, 'ab') as f:
-                os.utime(f.fileno(), (mod_time, mod_time))
-        else:
-            # Tested on linux ext4 only
+    def set_last_access_modification_datetime(full_path, mod_time):
             os.utime(full_path, (mod_time, mod_time))
 
-    def fix_creation_modification_datetime(self, m_date_time, full_path):
-        if not (self.same_modification_date(full_path, m_date_time) and self.same_creation_date(full_path, m_date_time)):
-            self.set_creation_modification_datetime(full_path,time.mktime(m_date_time.timetuple()))
+    def fix_last_access_modification_datetime(self, m_date_time, full_path):
+        if not (self.same_modification_date(full_path, m_date_time)): # and self.same_creation_date(full_path, m_date_time)):
+            self.set_last_access_modification_datetime(full_path,time.mktime(m_date_time.timetuple()))
             return True  # modified
         return False
 
@@ -128,11 +122,11 @@ class FixExif:
 
     def fix_video(self, filename, full_path):
         date = self.get_datetime(filename)
-        return self.fix_creation_modification_datetime(date, full_path)
+        return self.fix_last_access_modification_datetime(date, full_path)
 
     def fix_image(self, filename, full_path):
         date = self.get_datetime(filename)
-        modif = self.fix_creation_modification_datetime(date,
+        modif = self.fix_last_access_modification_datetime(date,
                                                         full_path)
         modif2 = self.fix_exif(date, full_path)
         return modif or modif2
