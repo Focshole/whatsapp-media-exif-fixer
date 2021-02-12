@@ -2,7 +2,7 @@ import os
 import re
 import time
 from datetime import datetime, timedelta
-
+import platform
 import piexif
 
 import signal
@@ -61,58 +61,79 @@ class FixExif:
                 self.is_a_wa_file(file_name) and self.is_allowed_ext(file_name)]
 
     @staticmethod
-    def same_modification_time(full_path, mod_time):
-        return os.path.getmtime(full_path) == mod_time and os.path.getctime(full_path) == mod_time
+    def same_creation_date(full_path, creat_time):
+        # https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python#237084
+        if platform.system() == 'Windows':
+            return os.path.getctime(full_path).date() == creat_time.date()
+        else:
+            stat = os.stat(full_path)
+            try:
+                return datetime.fromtimestamp(stat.st_birthtime).date() == creat_time.date()
+            except AttributeError:
+                # We're probably on Linux. No easy way to get creation dates here,
+                # so we'll settle for when its content was last modified.
+                return datetime.fromtimestamp(stat.st_mtime).date() == creat_time.date()
 
-    def fix_modification_time(self, date, full_path):
-        modTime = time.mktime(date.timetuple())
-        if not self.same_modification_time(full_path, modTime):
-            os.utime(full_path, (modTime, modTime))
+    @staticmethod
+    def same_modification_date(full_path, mod_time):
+        return datetime.fromtimestamp(os.path.getmtime(full_path)).date() == mod_time.date()
+
+    @staticmethod
+    def set_creation_modification_datetime(full_path, mod_time):
+        # from https://stackoverflow.com/questions/42630281/utime-has-no-effect-in-windows
+        if platform.system() == "Windows":
+            with open(full_path, 'ab') as f:
+                os.utime(f.fileno(), (mod_time, mod_time))
+        else:
+            # Tested on linux ext4 only
+            os.utime(full_path, (mod_time, mod_time))
+
+    def fix_creation_modification_datetime(self, m_date_time, full_path):
+        if not (self.same_modification_date(full_path, m_date_time) and self.same_creation_date(full_path, m_date_time)):
+            self.set_creation_modification_datetime(full_path,time.mktime(m_date_time.timetuple()))
             return True  # modified
         return False
 
     @staticmethod
-    def same_exif_creation_time(date, full_path):
+    def same_exif_acquisition_date(date, full_path):
+        # the original file's exif are much probably more reliable than
+        # the ones which are generated if the date matches
         old_exif_data = piexif.load(full_path)
         if old_exif_data is not None and 'Exif' in old_exif_data:
             exif_dict = old_exif_data['Exif']
-            if piexif.ExifIFD.DateTimeOriginal in exif_dict and \
-                    exif_dict[piexif.ExifIFD.DateTimeOriginal] == bytes(date, "UTF-8"):
-                return True
+            if piexif.ExifIFD.DateTimeOriginal in exif_dict:
+                exif_date = datetime.strptime(exif_dict[piexif.ExifIFD.DateTimeOriginal].decode(),"%Y:%m:%d %H:%M:%S")
+                if exif_date.date() == date.date():
+                    return True
         return False
 
-    def fix_exif(self, date, full_path):
-        date = date.strftime("%Y:%m:%d %H:%M:%S")
-        if not self.same_exif_creation_time(date, full_path):
+    def fix_exif(self, acquisition_time, full_path):
+
+        if not self.same_exif_acquisition_date(acquisition_time, full_path):
             exif_dict = piexif.load(full_path)
-            if 'Exif' not in exif_dict:
-                # no exif, add them
-                exif_dict['Exif'] = {piexif.ExifIFD.DateTimeOriginal: date}
-            else:
+            if 'Exif' in exif_dict:
                 exif_data = exif_dict['Exif']
-                if piexif.ExifIFD.DateTimeOriginal in exif_data and exif_data[piexif.ExifIFD.DateTimeOriginal][
-                                                                    :8] == bytes(
-                        date, "UTF-8")[:8]:
-                    return False  # the original file's exif are much probably more reliable than
-                    # the ones which are generated if the day matches
-                else:
-                    exif_data[piexif.ExifIFD.DateTimeOriginal] = date  # simply edit that field
-                    exif_dict['Exif'] = exif_data  # update the exif data
+                if piexif.ExifIFD.DateTimeOriginal in exif_data:
+                    exif_time = exif_dict[piexif.ExifIFD.DateTimeOriginal]
+                    if exif_time.date() == acquisition_time.date():
+                        return False  
+            exif_data[piexif.ExifIFD.DateTimeOriginal] = acquisition_time.strftime("%Y:%m:%d %H:%M:%S")  # simply edit that field
+            exif_dict['Exif'] = exif_data  # update the exif data
             exif_bytes = piexif.dump(exif_dict)
-            piexif.remove(
-                full_path)  # If the program gets interrupted here, it may cause data loss and possible errors
+            piexif.remove(full_path)  # If the program gets interrupted here, 
+                                      #it may cause exif data loss and possible errors
             piexif.insert(exif_bytes, full_path)  # same there
             return True  # Modified
         return False
 
     def fix_video(self, filename, full_path):
         date = self.get_datetime(filename)
-        return self.fix_modification_time(date, full_path)
+        return self.fix_creation_modification_datetime(date, full_path)
 
     def fix_image(self, filename, full_path):
         date = self.get_datetime(filename)
-        modif = self.fix_modification_time(date,
-                                           full_path)
+        modif = self.fix_creation_modification_datetime(date,
+                                                        full_path)
         # TODO: check which parameter won't get modified (running twice shouldn't touch the same files again)
         modif2 = self.fix_exif(date, full_path)
         return modif or modif2
@@ -128,10 +149,10 @@ class FixExif:
             filename = filename[1]
             initial_size = os.path.getsize(full_path)
             if filename.endswith('jpg') or filename.endswith('jpeg'):
-                self.Ui.print(f"Reading image {filename}...")
+                # self.Ui.print(f"Reading image {filename}...")
                 modified = self.fix_image(filename, full_path)
             else:
-                self.Ui.print(f"Reading video {filename}...")
+                # self.Ui.print(f"Reading video {filename}...")
                 modified = self.fix_video(filename, full_path)
             num_digits = len(str(num_files))
             final_size = os.path.getsize(full_path)
