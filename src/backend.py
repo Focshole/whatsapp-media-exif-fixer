@@ -86,8 +86,9 @@ class FixExif:
         os.utime(full_path, (m, m))
     @staticmethod
     def set_creation_datetime(full_path,creat_time):
+        ct=creat_time.timestamp()
         if platform.system() == 'Windows': #There is no parameter on linux about this
-                setctime(full_path, creat_time)
+                setctime(full_path, ct)
 
     def fix_creation_modification_datetime(self, m_date_time, full_path):
         modified=False
