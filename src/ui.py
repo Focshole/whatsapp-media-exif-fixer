@@ -142,17 +142,21 @@ class MainFrame(wx.Frame):  # Main container 4 all the UI stuff
 class BackendPrinter:
     def __init__(self, textbox=None):
         self.__textbox = textbox
+        wx.UpdateUIEvent()
 
     def set_textbox(self,
                     txtb):  # this will be updated again once it will have created the window. It is very ugly,
         # needs to be changed
         self.__textbox = txtb
+        wx.UpdateUIEvent()
 
     def print(self, text):
         if self.__textbox is None:
             wx.MessageBox(text, "Information", wx.OK)
         else:
+            print(text)
             self.__textbox.ChangeValue(self.__textbox.GetValue() + text + "\n")
+            wx.UpdateUIEvent()
 
     def warn(self, text):
         wx.MessageBox(text, "Warning", wx.OK | wx.ICON_WARNING)

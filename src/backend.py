@@ -164,7 +164,7 @@ class FixExif:
             num_digits = len(str(num_files))
             final_size = os.path.getsize(full_path)
             diff_size = final_size - initial_size
-            if diff_size < 0 or diff_size > 60:
+            if diff_size < -60 or diff_size > 60:
                 self.Ui.error(
                     f"ERROR: file {full_path} got possibly corrupted! Initial size was {initial_size / 1024} Kb,",
                     f"final size was {final_size / 1024} Kb.",
